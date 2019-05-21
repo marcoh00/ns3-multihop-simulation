@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.0)
 
-project(simulation1)
+project(simulation2)
 
 set(NS3BUILDDIR /home/marco/Anwendungen/ns3/ns-3.29/build)
 find_library(NSLIB01 ns3.29-core-debug PATHS ${NS3BUILDDIR}/lib)
@@ -75,7 +75,7 @@ find_library(NSLIB69 ns3.29-wimax-test-debug PATHS ${NS3BUILDDIR}/lib)
 find_library(NSLIB70 ns3.29-test-test-debug PATHS ${NS3BUILDDIR}/lib)
 
 
-set(SOURCE simulation1.cc custom-bulk-send-application.cc custom-bulk-send-helper.cc)
+set(SOURCE simulation2.cc custom-bulk-send-application.cc custom-bulk-send-helper.cc)
 
 add_executable(${PROJECT_NAME} ${SOURCE})
 target_include_directories(${PROJECT_NAME} PUBLIC ${NS3BUILDDIR})
