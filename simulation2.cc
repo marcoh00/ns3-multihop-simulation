@@ -143,6 +143,7 @@ main(int argc, char *argv[]) {
 
     MobilityHelper mobility;
     Ptr<ListPositionAllocator> positionAlloc = CreateObject<ListPositionAllocator>();
+    // Do place the nodes into 'free air', so that we do not get any reflections (ex. ground)
     positionAlloc->Add(Vector (100.0, 100.0, 100.0));
     positionAlloc->Add(Vector (distance + 100.0, 100.0, 100.0));
     mobility.SetPositionAllocator(positionAlloc);
