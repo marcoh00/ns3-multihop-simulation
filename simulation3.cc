@@ -45,6 +45,7 @@
 #include <fstream>
 #include "ns3/core-module.h"
 #include "ns3/internet-module.h"
+#include "ns3/point-to-point-module.h"
 #include "ns3/applications-module.h"
 #include "ns3/network-module.h"
 #include "ns3/packet-sink.h"
@@ -53,7 +54,9 @@
 #include "ns3/ipv4-address-helper.h"
 #include "ns3/yans-wifi-channel.h"
 #include "ns3/mobility-model.h"
+#include "ns3/olsr-helper.h"
 #include "custom-bulk-send-helper.h"
+
 
 using namespace ns3;
 
@@ -70,12 +73,19 @@ main(int argc, char *argv[]) {
     // Default: 512 Bytes per packet
     uint32_t send_size = 1024;
     // We simulate a tcp connection (example's default). Can be changed to `ns3::UdpSocketFactory`.
-    std::string socket_factory = "ns3::TcpSocketFactory";
+    std::string socket_factory = "ns3::UdpSocketFactory";
     // Wifi Rate - get those from src/wifi/model/wifi-phy.cc for IEEE802.11g
     // Examples: ErpOfdmRate{48 36 48 18 12 9 6}Mbps
     std::string wifi_transmission_mode = "ErpOfdmRate54Mbps";
     // Distance between simulated nodes
     double distance = 5.0;
+    // Match the TP Link router's ethernet speed
+    std::string data_rate = "100Mbps";
+
+    // This is the default from the example code - as I do not have measurements of real-world
+    // P2P-links I'll keep it like that. Can be configured via command line just in case!
+    std::string delay = "5ms";
+
 
     //
     // Allow the user to override any of the defaults at
@@ -89,14 +99,45 @@ main(int argc, char *argv[]) {
     cmd.AddValue("socket_factory", "Socket Factory to use. Default is ns3::TcpSocketFactory", socket_factory);
     cmd.AddValue("wifi_transmission_mode", "WiFi transmission mode to use for 802.11g: ErpOfdmRate{48 36 48 18 12 9 6}Mbps", wifi_transmission_mode);
     cmd.AddValue("distance", "Distance between simulated nodes", distance);
+    cmd.AddValue("data_rate", "Point-to-point link data rate", data_rate);
+    cmd.AddValue("delay", "Point-to-Point connection delay", delay);
     cmd.Parse(argc, argv);
 
     //
     // Explicitly create the nodes required by the topology (shown above).
     //
     NS_LOG_INFO("Create nodes.");
-    NodeContainer nodes;
-    nodes.Create(2);
+    NodeContainer laptops;
+    laptops.Create(2);
+
+    NodeContainer routers;
+    routers.Create(4);
+
+    NodeContainer allNodes(laptops, routers);
+
+    Ptr<Node> laptop1 = laptops.Get(0);
+    Ptr<Node> laptop2 = laptops.Get(1);
+
+    NodeContainer firstHop;
+    firstHop.Add(laptops.Get(0));
+    firstHop.Add(routers.Get(0));
+
+    NodeContainer secondHop;
+    secondHop.Add(routers.Get(0));
+    secondHop.Add(routers.Get(1));
+
+    NodeContainer thirdHop;
+    thirdHop.Add(routers.Get(1));
+    thirdHop.Add(routers.Get(2));
+
+    NodeContainer fourthHop;
+    fourthHop.Add(routers.Get(2));
+    fourthHop.Add(routers.Get(3));
+
+    NodeContainer fifthHop;
+    fifthHop.Add(routers.Get(3));
+    fifthHop.Add(laptops.Get(1));
+
 
     //
     // Setup Wifi
@@ -142,22 +183,38 @@ main(int argc, char *argv[]) {
     WifiMacHelper wifiMac;
     wifiMac.SetType("ns3::AdhocWifiMac");
 
-    NetDeviceContainer devices = wifi.Install(wifiPhy, wifiMac, nodes);
 
     MobilityHelper mobility;
     Ptr<ListPositionAllocator> positionAlloc = CreateObject<ListPositionAllocator>();
     // Do place the nodes into 'free air', so that we do not get any reflections (ex. ground)
     positionAlloc->Add(Vector (100.0, 100.0, 100.0));
-    positionAlloc->Add(Vector (distance + 100.0, 100.0, 100.0));
+    for(auto i = 0; i < 3; i++) {
+        positionAlloc->Add(Vector(((double)i * distance) + 100.0, 100.0, 100.0));
+    }
     mobility.SetPositionAllocator(positionAlloc);
     mobility.SetMobilityModel("ns3::ConstantPositionMobilityModel");
-    mobility.Install(nodes);
+    mobility.Install(routers);
 
     //
-    // Install the internet stack on the nodes (IP)
+    // Ethernet Connections
     //
+
+    PointToPointHelper pointToPoint;
+    pointToPoint.SetDeviceAttribute("DataRate", StringValue(data_rate));
+    pointToPoint.SetChannelAttribute("Delay", StringValue(delay));
+
+    NetDeviceContainer firstHopDevices = pointToPoint.Install(firstHop);
+    NetDeviceContainer routerDevices = wifi.Install(wifiPhy, wifiMac, routers);
+    NetDeviceContainer lastHopDevices = pointToPoint.Install(fifthHop);
+
+    //
+    // Install the internet stack with OLSR on the nodes (IP)
+    //
+    OlsrHelper olsr;
     InternetStackHelper internet;
-    internet.Install(nodes);
+    internet.Install(laptops);
+    //internet.SetRoutingHelper(olsr);
+    internet.Install(routers);
 
     //
     // We've got the "hardware" in place.  Now we need to add IP addresses.
@@ -165,7 +222,55 @@ main(int argc, char *argv[]) {
     NS_LOG_INFO("Assign IP Addresses.");
     Ipv4AddressHelper ipv4;
     ipv4.SetBase("10.1.1.0", "255.255.255.0");
-    Ipv4InterfaceContainer i = ipv4.Assign(devices);
+    Ipv4InterfaceContainer firstNet = ipv4.Assign(firstHopDevices);
+    ipv4.SetBase("10.1.2.0", "255.255.255.0");
+    Ipv4InterfaceContainer routerNet = ipv4.Assign(routerDevices);
+    ipv4.SetBase("10.1.10.0", "255.255.255.0");
+    Ipv4InterfaceContainer lastNet = ipv4.Assign(lastHopDevices);
+    //Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
+
+    Ptr<Ipv4> laptop1addr = laptop1->GetObject<Ipv4>();
+    Ptr<Ipv4> laptop2addr = laptop2->GetObject<Ipv4>();
+    Ptr<Ipv4> router1addr = routers.Get(0)->GetObject<Ipv4>();
+    Ptr<Ipv4> router2addr = routers.Get(1)->GetObject<Ipv4>();
+    Ptr<Ipv4> router3addr = routers.Get(2)->GetObject<Ipv4>();
+    Ptr<Ipv4> router4addr = routers.Get(3)->GetObject<Ipv4>();
+
+    Ipv4StaticRoutingHelper staticRoutingHelper;
+    Ptr<Ipv4StaticRouting> l1_l1tol2 = staticRoutingHelper.GetStaticRouting(laptop1addr);
+    l1_l1tol2->AddHostRouteTo(Ipv4Address("10.1.10.2"), Ipv4Address("10.1.1.2"), 1);
+
+    Ptr<Ipv4StaticRouting> r1_l1tol2 = staticRoutingHelper.GetStaticRouting(router1addr);
+    r1_l1tol2->AddHostRouteTo(Ipv4Address("10.1.10.2"), Ipv4Address("10.1.2.4"), 2);
+
+    //Ptr<Ipv4StaticRouting> r2_l1tol2 = staticRoutingHelper.GetStaticRouting(router2addr);
+    //r2_l1tol2->AddHostRouteTo(Ipv4Address("10.1.10.2"), Ipv4Address("10.1.2.4"), 2);
+
+
+    /*// Tell Laptop 1 how to route
+    Ptr<Ipv4> laptop1addr = laptop1->GetObject<Ipv4>();
+    Ptr<Ipv4> laptop2addr = laptop2->GetObject<Ipv4>();
+    Ptr<Ipv4> router1addr = routers.Get(0)->GetObject<Ipv4>();
+    Ptr<Ipv4> router2addr = routers.Get(1)->GetObject<Ipv4>();
+    Ptr<Ipv4> router3addr = routers.Get(2)->GetObject<Ipv4>();
+    Ptr<Ipv4> router4addr = routers.Get(3)->GetObject<Ipv4>();
+
+
+
+    Ptr<Ipv4StaticRouting> l1_l1tol2 = staticRoutingHelper.GetStaticRouting(laptop1addr);
+    l1_l1tol2->AddHostRouteTo(fifthHopNet.GetAddress(1), firstHopNet.GetAddress(1), 1);
+
+    Ptr<Ipv4StaticRouting> r1_l1tol2 = staticRoutingHelper.GetStaticRouting(router1addr);
+    l1_l1tol2->AddHostRouteTo(fifthHopNet.GetAddress(1), secondHopNet.GetAddress(1), 2);
+
+    Ptr<Ipv4StaticRouting> r2_l1tol2 = staticRoutingHelper.GetStaticRouting(router2addr);
+    l1_l1tol2->AddHostRouteTo(fifthHopNet.GetAddress(1), thirdHopNet.GetAddress(1), 2);
+
+    Ptr<Ipv4StaticRouting> r3_l1tol2 = staticRoutingHelper.GetStaticRouting(router3addr);
+    l1_l1tol2->AddHostRouteTo(fifthHopNet.GetAddress(1), fourthHopNet.GetAddress(1), 2);
+
+    Ptr<Ipv4StaticRouting> staticRouting2 = staticRoutingHelper.GetStaticRouting(laptop2addr);
+    staticRouting2->AddHostRouteTo(firstHopNet.GetAddress(0), fourthHopNet.GetAddress(1), 1);*/
 
     NS_LOG_INFO("Create Applications.");
 
@@ -178,23 +283,24 @@ main(int argc, char *argv[]) {
 
 
     CustomBulkSendHelper source(socket_factory,
-                                InetSocketAddress(i.GetAddress(1), port));
+                                InetSocketAddress(Ipv4Address("10.1.10.2"), port));
     // Set the amount of data to send in bytes.  Zero is unlimited.
     source.SetAttribute("MaxBytes", UintegerValue(maxBytes));
     // Set the amount of data to send per packet
     source.SetAttribute("SendSize", UintegerValue(send_size));
-    ApplicationContainer sourceApps = source.Install(nodes.Get(0));
-    sourceApps.Start(Seconds(0.0));
-    sourceApps.Stop(Seconds(10.0));
+    ApplicationContainer sourceApps = source.Install(laptops.Get(0));
+    sourceApps.Start(Seconds(1.0));
+    sourceApps.Stop(Seconds(11.0));
 
     //
     // Create a PacketSinkApplication and install it on node 1
     //
     PacketSinkHelper sink(socket_factory,
                           InetSocketAddress(Ipv4Address::GetAny(), port));
-    ApplicationContainer sinkApps = sink.Install(nodes.Get(1));
-    sinkApps.Start(Seconds(0.0));
-    sinkApps.Stop(Seconds(10.0));
+    ApplicationContainer sinkApps = sink.Install(laptops.Get(1));
+
+    sinkApps.Start(Seconds(1.0));
+    sinkApps.Stop(Seconds(11.0));
 
     //
     // Set up tracing if enabled
@@ -213,7 +319,7 @@ main(int argc, char *argv[]) {
     // According to tests outputted to a PCAP file, the default file size of 1MiB takes about 0,2s
     // to transmit inside the simulation. Using a 1Mbps link, this time increses to a little bit under 10s.
     // For every realisic scenario, 10s should be okay.
-    Simulator::Stop(Seconds(10.0));
+    Simulator::Stop(Seconds(12.0));
     Simulator::Run();
     Simulator::Destroy();
     NS_LOG_INFO("Done.");
