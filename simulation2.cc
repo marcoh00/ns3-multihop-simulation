@@ -113,6 +113,11 @@ main(int argc, char *argv[]) {
     wifi.SetStandard(WIFI_PHY_STANDARD_80211g);
 
     YansWifiPhyHelper wifiPhy = YansWifiPhyHelper::Default();
+    wifiPhy.Set("ChannelWidth", UintegerValue(20));
+    wifiPhy.Set("TxGain", DoubleValue(1.0));
+    wifiPhy.Set("RxGain", DoubleValue(1.0));
+    wifiPhy.Set("TxPowerStart", DoubleValue(1.0));
+    wifiPhy.Set("TxPowerEnd", DoubleValue(1.0));
     YansWifiChannelHelper wifiChannel;
     wifiChannel.SetPropagationDelay ("ns3::ConstantSpeedPropagationDelayModel");
 
@@ -133,9 +138,7 @@ main(int argc, char *argv[]) {
     // This class uses always the same transmission rate for every packet sent."
     //
 
-    wifi.SetRemoteStationManager("ns3::ConstantRateWifiManager",
-                                  "DataMode", StringValue(wifi_transmission_mode),
-                                  "ControlMode", StringValue(wifi_transmission_mode));
+    wifi.SetRemoteStationManager("ns3::MinstrelWifiManager");
     WifiMacHelper wifiMac;
     wifiMac.SetType("ns3::AdhocWifiMac");
 
