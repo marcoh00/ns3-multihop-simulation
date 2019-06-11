@@ -1,6 +1,6 @@
 # Simulation Model 3
 
-WiFi, variable distances. This submission is largely based on simulation1, simulation2 and ns3's simple-wifi-adhoc example.
+Multi Hop, Wifi, p2p, olsr. This submission is largely based on simulation1, simulation2 and ns3's examples.
 Please find the changes made inside the comments at the top of `simulation3.cc`.
 
 Additional hint: It makes sense to use the `--tracing` flag when running the simulation as it produces nice and
