@@ -73,8 +73,7 @@ CustomBulkSendApplication::GetTypeId (void)
                    MakeTypeIdChecker ())
     .AddTraceSource ("Tx", "A new packet is created and is sent",
                      MakeTraceSourceAccessor (&CustomBulkSendApplication::m_txTrace),
-                     "ns3::Packet::TracedCallback")
-  ;
+                     "ns3::Packet::TracedCallback");
   return tid;
 }
 
@@ -223,6 +222,8 @@ void CustomBulkSendApplication::SendData (void)
     {
       m_socket->Close ();
       m_connected = false;
+      m_doneTrace();
+      NS_LOG_INFO("All packets sent at " << Simulator::Now());
     }
 }
 

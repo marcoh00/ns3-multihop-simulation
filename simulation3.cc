@@ -63,11 +63,26 @@
 #include "ns3/mobility-model.h"
 #include "ns3/olsr-helper.h"
 #include "custom-bulk-send-helper.h"
+#include "custom-bulk-send-application.h"
 
 
 using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE ("BulkSendExample");
+
+ns3::Time last_time_tx;
+uint64_t packet_count_tx = 0;
+void TxPacket(Ptr<const Packet> packet) {
+    last_time_tx = Simulator::Now();
+    packet_count_tx++;
+}
+
+ns3::Time last_time_rx;
+uint64_t packet_count_rx = 0;
+void RecvPacket(Ptr<const Packet> packet, const Address & address) {
+    last_time_rx = Simulator::Now();
+    packet_count_rx++;
+}
 
 int
 main(int argc, char *argv[]) {
@@ -298,7 +313,9 @@ main(int argc, char *argv[]) {
     source.SetAttribute("SendSize", UintegerValue(send_size));
     ApplicationContainer sourceApps = source.Install(laptops.Get(0));
     sourceApps.Start(Seconds(0.0));
-    sourceApps.Stop(Seconds(10.0));
+    sourceApps.Stop(Seconds(90.0));
+    Ptr<CustomBulkSendApplication> source1 = DynamicCast<CustomBulkSendApplication>(sourceApps.Get(0));
+    source1->TraceConnectWithoutContext("Tx", MakeCallback(&TxPacket));
 
     //
     // Create a PacketSinkApplication and install it on laptop 2
@@ -308,7 +325,10 @@ main(int argc, char *argv[]) {
     ApplicationContainer sinkApps = sink.Install(laptops.Get(1));
 
     sinkApps.Start(Seconds(0.0));
-    sinkApps.Stop(Seconds(10.0));
+    sinkApps.Stop(Seconds(90.0));
+
+    Ptr<PacketSink> sink1 = DynamicCast<PacketSink>(sinkApps.Get(0));
+    sink1->TraceConnectWithoutContext("Rx", MakeCallback(&RecvPacket));
 
     //
     // Set up tracing if enabled
@@ -327,11 +347,16 @@ main(int argc, char *argv[]) {
     // According to tests outputted to a PCAP file, the default file size of 1MiB takes about 0,2s
     // to transmit inside the simulation. Using a 1Mbps link, this time increses to a little bit under 10s.
     // For every realisic scenario, 10s should be okay.
-    Simulator::Stop(Seconds(10.0));
+    Simulator::Stop(Seconds(30.0));
     Simulator::Run();
     Simulator::Destroy();
     NS_LOG_INFO("Done.");
 
-    Ptr<PacketSink> sink1 = DynamicCast<PacketSink>(sinkApps.Get(0));
-    std::cout << "Total Bytes Received: " << sink1->GetTotalRx() << std::endl;
+    
+    std::cout << "Total Bytes Received: " << sink1->GetTotalRx() << " (" << ((double)sink1->GetTotalRx() / maxBytes) * 100.0 << "%)" << std::endl;
+    std::cout << "Total packets received: " << packet_count_rx << std::endl;
+    std::cout << "Last packet received at: " << last_time_rx.GetMilliSeconds() << "ms" << std::endl;
+    std::cout << std::endl;
+    std::cout << "Total packets sent: " << packet_count_tx << std::endl;
+    std::cout << "Last packet sent at: " << last_time_tx.GetMilliSeconds() << "ms" << std::endl;
 }
