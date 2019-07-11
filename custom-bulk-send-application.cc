@@ -36,6 +36,7 @@
 #include "ns3/uinteger.h"
 #include "ns3/trace-source-accessor.h"
 #include "ns3/tcp-socket-factory.h"
+#include "ns3/udp-socket.h"
 #include "custom-bulk-send-application.h"
 
 namespace ns3 {
@@ -222,7 +223,6 @@ void CustomBulkSendApplication::SendData (void)
     {
       m_socket->Close ();
       m_connected = false;
-      m_doneTrace();
       NS_LOG_INFO("All packets sent at " << Simulator::Now());
     }
 }
