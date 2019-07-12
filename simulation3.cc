@@ -73,16 +73,20 @@ NS_LOG_COMPONENT_DEFINE ("BulkSendExample");
 Ptr<CustomBulkSendApplication> bulk_send;
 
 ns3::Time last_time_tx;
+uint64_t packet_count_tx = 0;
 uint64_t packet_size_tx = 0;
 void TxPacket(Ptr<const Packet> packet) {
     last_time_tx = Simulator::Now();
+    packet_count_tx++;
     packet_size_tx += packet->GetSize();
 }
 
 ns3::Time last_time_rx;
+uint64_t packet_count_rx = 0;
 uint64_t packet_size_rx = 0;
 void RecvPacket(Ptr<const Packet> packet, const Address &address) {
     last_time_rx = Simulator::Now();
+    packet_count_rx++;
     packet_size_rx += packet->GetSize();
     bulk_send->AnnouncePacketsReceived(packet_size_rx);
 }
@@ -317,16 +321,21 @@ main(int argc, char *argv[]) {
 
     std::cerr << "Total Bytes Received: " << sink1->GetTotalRx() << " ("
               << ((double) sink1->GetTotalRx() / maxBytes) * 100.0 << "%)" << std::endl;
+    std::cerr << "Total packets received: " << packet_count_rx << std::endl;
     std::cerr << "Total size of packets received: " << packet_size_rx << std::endl;
     std::cerr << "Last packet received at: " << last_time_rx.GetMilliSeconds() << "ms" << std::endl;
     std::cerr << std::endl;
+    std::cerr << "Total packets sent: " << packet_count_tx << std::endl;
     std::cerr << "Total size of packets sent: " << packet_size_tx << std::endl;
     std::cerr << "Last packet sent at: " << last_time_tx.GetMilliSeconds() << "ms" << std::endl;
+
     std::cout << "{";
     std::cout << "\"rx_bytes_application\":" << sink1->GetTotalRx() << ",";
     std::cout << "\"rx_bytes_packets\":" << packet_size_rx << ",";
+    std::cout << "\"rx_count_packets\":" << packet_count_rx << ",";
     std::cout << "\"rx_ms_last\":" << last_time_rx.GetMilliSeconds() << ",";
     std::cout << "\"tx_bytes_packets\":" << packet_size_tx << ",";
+    std::cout << "\"tx_count_packets\":" << packet_count_tx << ",";
     std::cout << "\"tx_ms_last\":" << last_time_tx.GetMilliSeconds();
     std::cout << "}";
 }
