@@ -28,51 +28,44 @@
 
 namespace ns3 {
 
-CustomBulkSendHelper::CustomBulkSendHelper (std::string protocol, Address address)
-{
-  m_factory.SetTypeId ("ns3::CustomBulkSendApplication");
-  m_factory.Set ("Protocol", StringValue (protocol));
-  m_factory.Set ("Remote", AddressValue (address));
-}
-
-void
-CustomBulkSendHelper::SetAttribute (std::string name, const AttributeValue &value)
-{
-  m_factory.Set (name, value);
-}
-
-ApplicationContainer
-CustomBulkSendHelper::Install (Ptr<Node> node) const
-{
-  return ApplicationContainer (InstallPriv (node));
-}
-
-ApplicationContainer
-CustomBulkSendHelper::Install (std::string nodeName) const
-{
-  Ptr<Node> node = Names::Find<Node> (nodeName);
-  return ApplicationContainer (InstallPriv (node));
-}
-
-ApplicationContainer
-CustomBulkSendHelper::Install (NodeContainer c) const
-{
-  ApplicationContainer apps;
-  for (NodeContainer::Iterator i = c.Begin (); i != c.End (); ++i)
-    {
-      apps.Add (InstallPriv (*i));
+    CustomBulkSendHelper::CustomBulkSendHelper(std::string protocol, Address address) {
+        m_factory.SetTypeId("ns3::CustomBulkSendApplication");
+        m_factory.Set("Protocol", StringValue(protocol));
+        m_factory.Set("Remote", AddressValue(address));
     }
 
-  return apps;
-}
+    void
+    CustomBulkSendHelper::SetAttribute(std::string name, const AttributeValue &value) {
+        m_factory.Set(name, value);
+    }
 
-Ptr<Application>
-CustomBulkSendHelper::InstallPriv (Ptr<Node> node) const
-{
-  Ptr<Application> app = m_factory.Create<Application> ();
-  node->AddApplication (app);
+    ApplicationContainer
+    CustomBulkSendHelper::Install(Ptr<Node> node) const {
+        return ApplicationContainer(InstallPriv(node));
+    }
 
-  return app;
-}
+    ApplicationContainer
+    CustomBulkSendHelper::Install(std::string nodeName) const {
+        Ptr<Node> node = Names::Find<Node>(nodeName);
+        return ApplicationContainer(InstallPriv(node));
+    }
+
+    ApplicationContainer
+    CustomBulkSendHelper::Install(NodeContainer c) const {
+        ApplicationContainer apps;
+        for (NodeContainer::Iterator i = c.Begin(); i != c.End(); ++i) {
+            apps.Add(InstallPriv(*i));
+        }
+
+        return apps;
+    }
+
+    Ptr<Application>
+    CustomBulkSendHelper::InstallPriv(Ptr<Node> node) const {
+        Ptr<Application> app = m_factory.Create<Application>();
+        node->AddApplication(app);
+
+        return app;
+    }
 
 } // namespace ns3

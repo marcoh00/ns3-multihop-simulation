@@ -74,6 +74,7 @@ Ptr<CustomBulkSendApplication> bulk_send;
 
 ns3::Time last_time_tx;
 uint64_t packet_count_tx = 0;
+
 void TxPacket(Ptr<const Packet> packet) {
     last_time_tx = Simulator::Now();
     packet_count_tx++;
@@ -81,7 +82,8 @@ void TxPacket(Ptr<const Packet> packet) {
 
 ns3::Time last_time_rx;
 uint64_t packet_count_rx = 0;
-void RecvPacket(Ptr<const Packet> packet, const Address & address) {
+
+void RecvPacket(Ptr<const Packet> packet, const Address &address) {
     last_time_rx = Simulator::Now();
     packet_count_rx++;
     bulk_send->AnnouncePacketsReceived(packet_count_rx);
@@ -144,7 +146,7 @@ main(int argc, char *argv[]) {
 
     WifiHelper wifi;
 
-    if(logging) {
+    if (logging) {
         wifi.EnableLogComponents();
     }
 
@@ -160,7 +162,7 @@ main(int argc, char *argv[]) {
     wifiPhy.Set("TxPowerStart", DoubleValue(1.0));
     wifiPhy.Set("TxPowerEnd", DoubleValue(1.0));
     YansWifiChannelHelper wifiChannel;
-    wifiChannel.SetPropagationDelay ("ns3::ConstantSpeedPropagationDelayModel");
+    wifiChannel.SetPropagationDelay("ns3::ConstantSpeedPropagationDelayModel");
 
     //
     // "This class implements the ITU-R 1411 LOS propagation model for Line-of-Sight (LoS) short range outdoor
@@ -183,9 +185,9 @@ main(int argc, char *argv[]) {
     MobilityHelper mobility;
     Ptr<ListPositionAllocator> positionAlloc = CreateObject<ListPositionAllocator>();
     // Do place the nodes into 'free air', so that we do not get any reflections (ex. ground)
-    positionAlloc->Add(Vector (100.0, 100.0, 100.0));
-    for(auto i = 1; i < 4; i++) {
-        positionAlloc->Add(Vector(((double)i * distance) + 100.0, 100.0, 100.0));
+    positionAlloc->Add(Vector(100.0, 100.0, 100.0));
+    for (auto i = 1; i < 4; i++) {
+        positionAlloc->Add(Vector(((double) i * distance) + 100.0, 100.0, 100.0));
     }
     mobility.SetPositionAllocator(positionAlloc);
     mobility.SetMobilityModel("ns3::ConstantPositionMobilityModel");
@@ -197,13 +199,13 @@ main(int argc, char *argv[]) {
     // Install the internet stack with OLSR on the nodes (IP)
     //
     std::filebuf fb;
-  fb.open ("test.txt",std::ios::out);
-  std::ostream os(&fb);
-  OutputStreamWrapper wrap(&os);
+    fb.open("test.txt", std::ios::out);
+    std::ostream os(&fb);
+    OutputStreamWrapper wrap(&os);
     OlsrHelper olsrhelper;
     olsrhelper.PrintRoutingTableAllAt(ns3::Time("60s"), Ptr<OutputStreamWrapper>(&wrap));
     InternetStackHelper internet;
-    if(olsr) internet.SetRoutingHelper(olsrhelper);
+    if (olsr) internet.SetRoutingHelper(olsrhelper);
     internet.Install(routers);
 
     //
@@ -215,7 +217,7 @@ main(int argc, char *argv[]) {
     Ipv4InterfaceContainer routerNet = ipv4.Assign(routerDevices);
 
 
-    if(!olsr) {
+    if (!olsr) {
         //
         // Set up static routing to the packets get routed along the 4 different routers
         //
@@ -303,8 +305,9 @@ main(int argc, char *argv[]) {
     Simulator::Destroy();
     NS_LOG_INFO("Done.");
 
-    
-    std::cout << "Total Bytes Received: " << sink1->GetTotalRx() << " (" << ((double)sink1->GetTotalRx() / maxBytes) * 100.0 << "%)" << std::endl;
+
+    std::cout << "Total Bytes Received: " << sink1->GetTotalRx() << " ("
+              << ((double) sink1->GetTotalRx() / maxBytes) * 100.0 << "%)" << std::endl;
     std::cout << "Total packets received: " << packet_count_rx << std::endl;
     std::cout << "Last packet received at: " << last_time_rx.GetMilliSeconds() << "ms" << std::endl;
     std::cout << std::endl;
