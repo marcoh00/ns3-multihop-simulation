@@ -62,6 +62,7 @@
 #include "ns3/yans-wifi-channel.h"
 #include "ns3/mobility-model.h"
 #include "ns3/olsr-helper.h"
+#include "ns3/ipv4-l3-protocol.h"
 #include "custom-bulk-send-helper.h"
 #include "custom-bulk-send-application.h"
 
@@ -83,6 +84,10 @@ void MacTxDrop(Ptr<const Packet> p) {
 }
 void MacRxDrop(Ptr<const Packet> p) {
     std::cout << "MAC RX DROP" << std::endl;
+}
+
+void IpDrop(const Ipv4Header &header, Ptr< const Packet > packet, Ipv4L3Protocol::DropReason reason, Ptr< Ipv4 > ipv4, uint32_t interface) {
+    std::cout << "IP DROP" << std::endl;
 }
 
 ns3::Time last_time_tx;
@@ -203,24 +208,18 @@ main(int argc, char *argv[]) {
     mobility.SetMobilityModel("ns3::ConstantPositionMobilityModel");
     mobility.Install(routers);
 
-    //
-    // Ethernet Connections
-    //
-
-    PointToPointHelper pointToPoint;
-    pointToPoint.SetDeviceAttribute("DataRate", StringValue(data_rate));
-    pointToPoint.SetChannelAttribute("Delay", StringValue(delay));
-
-    NetDeviceContainer firstHopDevices = pointToPoint.Install(firstHop);
     NetDeviceContainer routerDevices = wifi.Install(wifiPhy, wifiMac, routers);
-    NetDeviceContainer lastHopDevices = pointToPoint.Install(lastHop);
 
     //
     // Install the internet stack with OLSR on the nodes (IP)
     //
+    std::filebuf fb;
+  fb.open ("test.txt",std::ios::out);
+  std::ostream os(&fb);
+  OutputStreamWrapper wrap(&os);
     OlsrHelper olsrhelper;
+    olsrhelper.PrintRoutingTableAllAt(ns3::Time("60s"), Ptr<OutputStreamWrapper>(&wrap));
     InternetStackHelper internet;
-    internet.Install(laptops);
     if(olsr) internet.SetRoutingHelper(olsrhelper);
     internet.Install(routers);
 
@@ -319,6 +318,7 @@ main(int argc, char *argv[]) {
     Config::ConnectWithoutContext("/NodeList/*/DeviceList/*/$ns3::WifiNetDevice/Phy/PhyRxDrop", MakeCallback(&PhyRxDrop));
     Config::ConnectWithoutContext("/NodeList/*/DeviceList/*/$ns3::WifiNetDevice/Phy/MacRxDrop", MakeCallback(&MacRxDrop));
     Config::ConnectWithoutContext("/NodeList/*/$ns3::UdpL4Protocol/SocketList/*/Drop", MakeCallback(&MacRxDrop));
+    Config::ConnectWithoutContext("/NodeList/*/$ns3::Ipv4L3Protocol/Drop", MakeCallback(&IpDrop));
 
     Simulator::Stop(Seconds(180.0));
     Simulator::Run();
