@@ -71,24 +71,10 @@ using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE ("BulkSendExample");
 
-void PhyRxDrop(Ptr<const Packet> p) {
-    std::cout << "PHY RX DROP" << std::endl;
-}
-
-void PhyTxDrop(Ptr<const Packet> p) {
-    std::cout << "PHY TX DROP" << std::endl;
-}
-
-void MacTxDrop(Ptr<const Packet> p) {
-    std::cout << "MAC TX DROP" << std::endl;
-}
-void MacRxDrop(Ptr<const Packet> p) {
-    std::cout << "MAC RX DROP" << std::endl;
-}
-
 void IpDrop(const Ipv4Header &header, Ptr< const Packet > packet, Ipv4L3Protocol::DropReason reason, Ptr< Ipv4 > ipv4, uint32_t interface) {
     std::cout << "IP DROP" << std::endl;
 }
+
 
 ns3::Time last_time_tx;
 uint64_t packet_count_tx = 0;
@@ -312,12 +298,7 @@ main(int argc, char *argv[]) {
     // According to tests outputted to a PCAP file, the default file size of 1MiB takes about 0,2s
     // to transmit inside the simulation. Using a 1Mbps link, this time increses to a little bit under 10s.
     // For every realisic scenario, 10s should be okay.
-
-    Config::ConnectWithoutContext("/NodeList/*/DeviceList/*/$ns3::WifiNetDevice/Mac/MacTxDrop", MakeCallback(&MacTxDrop));
-    Config::ConnectWithoutContext("/NodeList/*/DeviceList/*/$ns3::WifiNetDevice/Phy/PhyTxDrop", MakeCallback(&PhyTxDrop));
-    Config::ConnectWithoutContext("/NodeList/*/DeviceList/*/$ns3::WifiNetDevice/Phy/PhyRxDrop", MakeCallback(&PhyRxDrop));
-    Config::ConnectWithoutContext("/NodeList/*/DeviceList/*/$ns3::WifiNetDevice/Phy/MacRxDrop", MakeCallback(&MacRxDrop));
-    Config::ConnectWithoutContext("/NodeList/*/$ns3::UdpL4Protocol/SocketList/*/Drop", MakeCallback(&MacRxDrop));
+    
     Config::ConnectWithoutContext("/NodeList/*/$ns3::Ipv4L3Protocol/Drop", MakeCallback(&IpDrop));
 
     Simulator::Stop(Seconds(180.0));
