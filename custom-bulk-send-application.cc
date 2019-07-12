@@ -25,6 +25,7 @@
 // We try to schedule the first sent packet at simulator time 0 instead, if we shall use an udp socket.
 // This is mostly untested!
 
+#include <math.h>
 #include "ns3/log.h"
 #include "ns3/address.h"
 #include "ns3/node.h"
@@ -68,6 +69,16 @@ CustomBulkSendApplication::GetTypeId (void)
                    UintegerValue (0),
                    MakeUintegerAccessor (&CustomBulkSendApplication::m_maxBytes),
                    MakeUintegerChecker<uint64_t> ())
+    .AddAttribute("UdpInterval",
+                  "UDP connections: Resend packets every x ms",
+                  UintegerValue(100),
+                  MakeUintegerAccessor(&CustomBulkSendApplication::m_udpinterval),
+                  MakeUintegerChecker<uint32_t>())
+     .AddAttribute("UdpCount",
+                   "UDP connections: Send x packets every timeframe",
+                   UintegerValue(100),
+                   MakeUintegerAccessor(&CustomBulkSendApplication::m_udpcount),
+                   MakeUintegerChecker<uint32_t>())
     .AddAttribute ("Protocol", "The type of protocol to use.",
                    TypeIdValue (TcpSocketFactory::GetTypeId ()),
                    MakeTypeIdAccessor (&CustomBulkSendApplication::m_tid),
@@ -82,7 +93,9 @@ CustomBulkSendApplication::GetTypeId (void)
 CustomBulkSendApplication::CustomBulkSendApplication ()
   : m_socket (0),
     m_connected (false),
-    m_totBytes (0)
+    m_isudp(false),
+    m_totBytes (0),
+    m_rxBytes (0)
 {
   NS_LOG_FUNCTION (this);
 }
@@ -135,6 +148,7 @@ void CustomBulkSendApplication::StartApplication (void) // Called at time specif
                         "CustomBulkSendApplication was patched to allow this and seems to work, but please take the "
                         "measurements with a grain of salt!");
             m_connected = true;
+            m_isudp = true;
             Simulator::Schedule(Seconds(0), &CustomBulkSendApplication::SendData, this);
         }
 
@@ -188,8 +202,8 @@ void CustomBulkSendApplication::StopApplication (void) // Called at time specifi
 void CustomBulkSendApplication::SendData (void)
 {
   NS_LOG_FUNCTION (this);
-
-  while (m_maxBytes == 0 || m_totBytes < m_maxBytes)
+  uint32_t usendcount = 0;
+  while (m_maxBytes == 0 || (!m_isudp && (m_totBytes < m_maxBytes)) || (m_isudp && (usendcount < m_udpcount)))
     { // Time to send more
 
       // uint64_t to allow the comparison later.
@@ -197,7 +211,7 @@ void CustomBulkSendApplication::SendData (void)
       // m_sendSize is uint32_t.
       uint64_t toSend = m_sendSize;
       // Make sure we don't send too many
-      if (m_maxBytes > 0)
+      if (m_maxBytes > 0 && !m_isudp)
         {
           toSend = std::min (toSend, m_maxBytes - m_totBytes);
         }
@@ -208,10 +222,11 @@ void CustomBulkSendApplication::SendData (void)
       if (actual > 0)
         {
           m_totBytes += actual;
+          usendcount++;
           m_txTrace (packet);
         }
       // We exit this loop when actual < toSend as the send side
-      // buffer is full. The "DataSent" callback will pop when
+      // buffer is full. The "DataSent"this->m_sendSize callback will pop when
       // some buffer space has freed ip.
       if ((unsigned)actual != toSend)
         {
@@ -219,12 +234,20 @@ void CustomBulkSendApplication::SendData (void)
         }
     }
   // Check if time to close (all sent)
-  if (m_totBytes == m_maxBytes && m_connected)
+  if (!m_isudp && (m_totBytes >= m_maxBytes))
     {
       m_socket->Close ();
       m_connected = false;
       NS_LOG_INFO("All packets sent at " << Simulator::Now());
     }
+  if(m_isudp && (m_rxBytes >= m_maxBytes)) {
+      m_socket->Close ();
+      m_connected = false;
+      NS_LOG_INFO("All packets sent at " << Simulator::Now());
+  }
+  else if(m_isudp && m_rxBytes < m_maxBytes) {
+      Simulator::Schedule(MilliSeconds(m_udpinterval), &CustomBulkSendApplication::SendData, this);
+  }
 }
 
 void CustomBulkSendApplication::ConnectionSucceeded (Ptr<Socket> socket)
@@ -251,6 +274,9 @@ void CustomBulkSendApplication::DataSend (Ptr<Socket>, uint32_t)
     }
 }
 
+void CustomBulkSendApplication::AnnouncePacketsReceived(uint64_t rxcnt) {
+    m_rxBytes = rxcnt * m_sendSize;
+}
 
 
 } // Namespace ns3

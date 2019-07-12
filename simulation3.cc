@@ -70,6 +70,8 @@ using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE ("BulkSendExample");
 
+Ptr<CustomBulkSendApplication> bulk_send;
+
 ns3::Time last_time_tx;
 uint64_t packet_count_tx = 0;
 void TxPacket(Ptr<const Packet> packet) {
@@ -82,6 +84,7 @@ uint64_t packet_count_rx = 0;
 void RecvPacket(Ptr<const Packet> packet, const Address & address) {
     last_time_rx = Simulator::Now();
     packet_count_rx++;
+    bulk_send->AnnouncePacketsReceived(packet_count_rx);
 }
 
 int
@@ -256,11 +259,13 @@ main(int argc, char *argv[]) {
     source.SetAttribute("MaxBytes", UintegerValue(maxBytes));
     // Set the amount of data to send per packet
     source.SetAttribute("SendSize", UintegerValue(send_size));
+    source.SetAttribute("UdpInterval", UintegerValue(1));
+    source.SetAttribute("UdpCount", UintegerValue(300));
     ApplicationContainer sourceApps = source.Install(routers.Get(0));
     sourceApps.Start(Seconds(30.0));
     sourceApps.Stop(Seconds(90.0));
-    Ptr<CustomBulkSendApplication> source1 = DynamicCast<CustomBulkSendApplication>(sourceApps.Get(0));
-    source1->TraceConnectWithoutContext("Tx", MakeCallback(&TxPacket));
+    bulk_send = DynamicCast<CustomBulkSendApplication>(sourceApps.Get(0));
+    bulk_send->TraceConnectWithoutContext("Tx", MakeCallback(&TxPacket));
 
     //
     // Create a PacketSinkApplication and install it on laptop 2

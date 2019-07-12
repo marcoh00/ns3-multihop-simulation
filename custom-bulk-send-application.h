@@ -98,7 +98,7 @@ public:
    * \return pointer to associated socket
    */
   Ptr<Socket> GetSocket (void) const;
-
+  void AnnouncePacketsReceived(uint64_t rxcnt);
 protected:
   virtual void DoDispose (void);
 private:
@@ -118,6 +118,10 @@ private:
   uint64_t        m_maxBytes;     //!< Limit total number of bytes sent
   uint64_t        m_totBytes;     //!< Total bytes sent so far
   TypeId          m_tid;          //!< The type of protocol to use.
+  uint64_t        m_rxBytes;
+  bool            m_isudp;
+  uint32_t        m_udpinterval;
+  uint32_t        m_udpcount;
 
   /// Traced Callback: sent packets
   TracedCallback<Ptr<const Packet> > m_txTrace;
