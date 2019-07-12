@@ -145,22 +145,9 @@ main(int argc, char *argv[]) {
     // Explicitly create the nodes required by the topology (shown above).
     //
     NS_LOG_INFO("Create nodes.");
-    NodeContainer laptops;
-    laptops.Create(2);
 
     NodeContainer routers;
     routers.Create(4);
-
-    NodeContainer allNodes(laptops, routers);
-
-    NodeContainer firstHop;
-    firstHop.Add(laptops.Get(0));
-    firstHop.Add(routers.Get(0));
-
-    NodeContainer lastHop;
-    lastHop.Add(routers.Get(3));
-    lastHop.Add(laptops.Get(1));
-
 
     //
     // Setup Wifi
@@ -242,72 +229,36 @@ main(int argc, char *argv[]) {
     //
     NS_LOG_INFO("Assign IP Addresses.");
     Ipv4AddressHelper ipv4;
-    ipv4.SetBase("10.1.1.0", "255.255.255.0");
-    Ipv4InterfaceContainer firstNet = ipv4.Assign(firstHopDevices);
     ipv4.SetBase("10.1.2.0", "255.255.255.0");
     Ipv4InterfaceContainer routerNet = ipv4.Assign(routerDevices);
-    ipv4.SetBase("10.1.10.0", "255.255.255.0");
-    Ipv4InterfaceContainer lastNet = ipv4.Assign(lastHopDevices);
 
-    //
-    // Set up static routing to the packets get routed along the 4 different routers
-    //
 
-    Ptr<Ipv4> laptop1addr = laptops.Get(0)->GetObject<Ipv4>();
-    Ptr<Ipv4> laptop2addr = laptops.Get(1)->GetObject<Ipv4>();
-    Ptr<Ipv4> router1addr = routers.Get(0)->GetObject<Ipv4>();
-    Ptr<Ipv4> router2addr = routers.Get(1)->GetObject<Ipv4>();
-    Ptr<Ipv4> router3addr = routers.Get(2)->GetObject<Ipv4>();
-    Ptr<Ipv4> router4addr = routers.Get(3)->GetObject<Ipv4>();
-    Ipv4StaticRoutingHelper staticRoutingHelper;
-    if(olsr) {
-        // Laptop 1 to Laptop 2 via Router 1
-        Ptr<Ipv4StaticRouting> l1_l1tol2 = staticRoutingHelper.GetStaticRouting(laptop1addr);
-        l1_l1tol2->AddHostRouteTo(Ipv4Address("10.1.10.2"), Ipv4Address("10.1.1.2"), 1);
-
-        // Router 1 needs to know it can reach its destination via router 4
-        Ptr<Ipv4StaticRouting> r1_l1tol2 = staticRoutingHelper.GetStaticRouting(router1addr);
-        r1_l1tol2->AddHostRouteTo(Ipv4Address("10.1.10.2"), Ipv4Address("10.1.2.4"), 2);
-
-        // Router 4 needs to know it can reach laptop 1 via router 1 (TCP ACK)
-        Ptr<Ipv4StaticRouting> r4_l1tol2 = staticRoutingHelper.GetStaticRouting(router4addr);
-        r4_l1tol2->AddHostRouteTo(Ipv4Address("10.1.1.1"), Ipv4Address("10.1.2.1"), 1);
-
-        // Laptop 2 needs to know it can reach laptop 1 via router 4 (TCP ACK)
-        Ptr<Ipv4StaticRouting> l2_l1tol2 = staticRoutingHelper.GetStaticRouting(laptop2addr);
-        l2_l1tol2->AddHostRouteTo(Ipv4Address("10.1.1.1"), Ipv4Address("10.1.10.1"), 1);
-    } else {
+    if(!olsr) {
         //
-        // Setup static routing
+        // Set up static routing to the packets get routed along the 4 different routers
         //
 
-        // Laptop 1 to Laptop 2 via router 1
-        Ptr<Ipv4StaticRouting> l1_l1tol2 = staticRoutingHelper.GetStaticRouting(laptop1addr);
-        l1_l1tol2->AddHostRouteTo(Ipv4Address("10.1.10.2"), Ipv4Address("10.1.1.2"), 1);
+        Ptr<Ipv4> router1addr = routers.Get(0)->GetObject<Ipv4>();
+        Ptr<Ipv4> router2addr = routers.Get(1)->GetObject<Ipv4>();
+        Ptr<Ipv4> router3addr = routers.Get(2)->GetObject<Ipv4>();
+        Ptr<Ipv4> router4addr = routers.Get(3)->GetObject<Ipv4>();
+        Ipv4StaticRoutingHelper staticRoutingHelper;
 
-        // Router 1 to Laptop 2 via router 2
+        // Router 1 to Router 4 via router 2
         Ptr<Ipv4StaticRouting> r1_l1tol2 = staticRoutingHelper.GetStaticRouting(router1addr);
-        r1_l1tol2->AddHostRouteTo(Ipv4Address("10.1.10.2"), Ipv4Address("10.1.2.2"), 2);
+        r1_l1tol2->AddHostRouteTo(Ipv4Address("10.1.2.4"), Ipv4Address("10.1.2.2"), 1);
 
-        // Router 2 to Laptop 2 via router 3
-        // Router 2 to Laptop 1 via router 1
+        // Router 2 to Router 4 via router 3
         Ptr<Ipv4StaticRouting> r2_l1tol2 = staticRoutingHelper.GetStaticRouting(router2addr);
-        r2_l1tol2->AddHostRouteTo(Ipv4Address("10.1.10.2"), Ipv4Address("10.1.2.3"), 1);
-        r2_l1tol2->AddHostRouteTo(Ipv4Address("10.1.1.1"), Ipv4Address("10.1.2.1"), 1);
+        r2_l1tol2->AddHostRouteTo(Ipv4Address("10.1.2.4"), Ipv4Address("10.1.2.3"), 1);
 
-        // Router 3 to Laptop 2 via via router 4
-        // Router 3 to Laptop 1 via via router 2
+        // Router 3 to Router 1 via via router 2
         Ptr<Ipv4StaticRouting> r3_l1tol2 = staticRoutingHelper.GetStaticRouting(router3addr);
-        r3_l1tol2->AddHostRouteTo(Ipv4Address("10.1.10.2"), Ipv4Address("10.1.2.4"), 1);
-        r3_l1tol2->AddHostRouteTo(Ipv4Address("10.1.1.1"), Ipv4Address("10.1.2.2"), 1);
+        r3_l1tol2->AddHostRouteTo(Ipv4Address("10.1.2.1"), Ipv4Address("10.1.2.2"), 1);
 
-        // Router 4 to Laptop 1 via via router 3
+        // Router 4 to Router 1 via via router 3
         Ptr<Ipv4StaticRouting> r4_l1tol2 = staticRoutingHelper.GetStaticRouting(router4addr);
-        r4_l1tol2->AddHostRouteTo(Ipv4Address("10.1.1.1"), Ipv4Address("10.1.2.3"), 1);
-
-        // Laptop 2 to Laptop 1 via via router 4
-        Ptr<Ipv4StaticRouting> l2_l1tol2 = staticRoutingHelper.GetStaticRouting(laptop2addr);
-        l2_l1tol2->AddHostRouteTo(Ipv4Address("10.1.1.1"), Ipv4Address("10.1.10.1"), 1);
+        r4_l1tol2->AddHostRouteTo(Ipv4Address("10.1.2.1"), Ipv4Address("10.1.2.3"), 1);
     }
 
     NS_LOG_INFO("Create Applications.");
@@ -321,13 +272,13 @@ main(int argc, char *argv[]) {
 
 
     CustomBulkSendHelper source(socket_factory,
-                                InetSocketAddress(Ipv4Address("10.1.10.2"), port));
+                                InetSocketAddress(Ipv4Address("10.1.2.4"), port));
     // Set the amount of data to send in bytes.  Zero is unlimited.
     source.SetAttribute("MaxBytes", UintegerValue(maxBytes));
     // Set the amount of data to send per packet
     source.SetAttribute("SendSize", UintegerValue(send_size));
-    ApplicationContainer sourceApps = source.Install(laptops.Get(0));
-    sourceApps.Start(Seconds(0.0));
+    ApplicationContainer sourceApps = source.Install(routers.Get(0));
+    sourceApps.Start(Seconds(30.0));
     sourceApps.Stop(Seconds(90.0));
     Ptr<CustomBulkSendApplication> source1 = DynamicCast<CustomBulkSendApplication>(sourceApps.Get(0));
     source1->TraceConnectWithoutContext("Tx", MakeCallback(&TxPacket));
@@ -337,7 +288,7 @@ main(int argc, char *argv[]) {
     //
     PacketSinkHelper sink(socket_factory,
                           InetSocketAddress(Ipv4Address::GetAny(), port));
-    ApplicationContainer sinkApps = sink.Install(laptops.Get(1));
+    ApplicationContainer sinkApps = sink.Install(routers.Get(3));
 
     sinkApps.Start(Seconds(0.0));
     sinkApps.Stop(Seconds(90.0));
@@ -369,7 +320,7 @@ main(int argc, char *argv[]) {
     Config::ConnectWithoutContext("/NodeList/*/DeviceList/*/$ns3::WifiNetDevice/Phy/MacRxDrop", MakeCallback(&MacRxDrop));
     Config::ConnectWithoutContext("/NodeList/*/$ns3::UdpL4Protocol/SocketList/*/Drop", MakeCallback(&MacRxDrop));
 
-    Simulator::Stop(Seconds(30.0));
+    Simulator::Stop(Seconds(180.0));
     Simulator::Run();
     Simulator::Destroy();
     NS_LOG_INFO("Done.");
