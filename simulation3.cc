@@ -62,7 +62,6 @@
 #include "ns3/yans-wifi-channel.h"
 #include "ns3/mobility-model.h"
 #include "ns3/olsr-helper.h"
-#include "ns3/ipv4-l3-protocol.h"
 #include "custom-bulk-send-helper.h"
 #include "custom-bulk-send-application.h"
 
@@ -70,11 +69,6 @@
 using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE ("BulkSendExample");
-
-void IpDrop(const Ipv4Header &header, Ptr< const Packet > packet, Ipv4L3Protocol::DropReason reason, Ptr< Ipv4 > ipv4, uint32_t interface) {
-    std::cout << "IP DROP" << std::endl;
-}
-
 
 ns3::Time last_time_tx;
 uint64_t packet_count_tx = 0;
@@ -298,8 +292,6 @@ main(int argc, char *argv[]) {
     // According to tests outputted to a PCAP file, the default file size of 1MiB takes about 0,2s
     // to transmit inside the simulation. Using a 1Mbps link, this time increses to a little bit under 10s.
     // For every realisic scenario, 10s should be okay.
-    
-    Config::ConnectWithoutContext("/NodeList/*/$ns3::Ipv4L3Protocol/Drop", MakeCallback(&IpDrop));
 
     Simulator::Stop(Seconds(180.0));
     Simulator::Run();
