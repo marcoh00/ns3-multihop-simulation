@@ -74,19 +74,21 @@ Ptr<CustomBulkSendApplication> bulk_send;
 
 ns3::Time last_time_tx;
 uint64_t packet_count_tx = 0;
-
+uint64_t packet_size_tx = 0;
 void TxPacket(Ptr<const Packet> packet) {
     last_time_tx = Simulator::Now();
     packet_count_tx++;
+    packet_size_tx += packet->GetSize();
 }
 
 ns3::Time last_time_rx;
 uint64_t packet_count_rx = 0;
-
+uint64_t packet_size_rx = 0;
 void RecvPacket(Ptr<const Packet> packet, const Address &address) {
     last_time_rx = Simulator::Now();
     packet_count_rx++;
-    bulk_send->AnnouncePacketsReceived(packet_count_rx);
+    packet_size_rx += packet->GetSize();
+    bulk_send->AnnouncePacketsReceived(packet_size_rx);
 }
 
 int
@@ -100,19 +102,20 @@ main(int argc, char *argv[]) {
     // Default: Stop after sending approx. 1 MiB of data
     uint32_t maxBytes = 1048576;
     // Default: 512 Bytes per packet
-    uint32_t send_size = 1024;
+    uint32_t send_size = 1000;
     // We simulate a tcp connection (example's default). Can be changed to `ns3::UdpSocketFactory`.
     std::string socket_factory = "ns3::TcpSocketFactory";
-    // Wifi Rate - get those from src/wifi/model/wifi-phy.cc for IEEE802.11g
-    // Examples: ErpOfdmRate{48 36 48 18 12 9 6}Mbps
     // Distance between simulated nodes
     double distance = 50.0;
-    // Match the TP Link router's ethernet speed
-    std::string data_rate = "100Mbps";
 
-    // This is the default from the example code - as I do not have measurements of real-world
-    // P2P-links I'll keep it like that. Can be configured via command line just in case!
-    std::string delay = "5ms";
+    // Height of simulated Wifi nodes in m
+    double height = 100.0;
+
+    uint32_t udp_interval = 10;
+    uint32_t udp_count = 100;
+    uint32_t start_at = 10260;
+
+    bool olsr_perf = false;
 
 
     //
@@ -123,12 +126,15 @@ main(int argc, char *argv[]) {
     cmd.AddValue("tracing", "Flag to enable/disable tracing", tracing);
     cmd.AddValue("logging", "Flag to enable/disable logging", logging);
     cmd.AddValue("olsr", "Use OLSR for wifi routing", olsr);
+    cmd.AddValue("olsrperf", "OLSR performance measurement", olsr_perf);
     cmd.AddValue("maxBytes", "Total number of bytes for application to send", maxBytes);
     cmd.AddValue("send_size", "Bytes sent per packet", send_size);
     cmd.AddValue("socket_factory", "Socket Factory to use. Default is ns3::TcpSocketFactory", socket_factory);
     cmd.AddValue("distance", "Distance between simulated nodes", distance);
-    cmd.AddValue("data_rate", "Point-to-point link data rate", data_rate);
-    cmd.AddValue("delay", "Point-to-Point connection delay", delay);
+    cmd.AddValue("height", "Height of Wifi Nodes", height);
+    cmd.AddValue("udp_interval", "Interval in which UDP packets get sent", udp_interval);
+    cmd.AddValue("udp_count", "How many UDP packets get sent per interval", udp_count);
+    cmd.AddValue("start_at", "At which time (ms) the BulkSender shall start sending", start_at);
     cmd.Parse(argc, argv);
 
     //
@@ -183,14 +189,14 @@ main(int argc, char *argv[]) {
     wifiMac.SetType("ns3::AdhocWifiMac");
 
     MobilityHelper mobility;
-    Ptr<ListPositionAllocator> positionAlloc = CreateObject<ListPositionAllocator>();
-    // Do place the nodes into 'free air', so that we do not get any reflections (ex. ground)
-    positionAlloc->Add(Vector(100.0, 100.0, 100.0));
-    for (auto i = 1; i < 4; i++) {
-        positionAlloc->Add(Vector(((double) i * distance) + 100.0, 100.0, 100.0));
-    }
-    mobility.SetPositionAllocator(positionAlloc);
+    Ptr<ListPositionAllocator> positionModel = CreateObject<ListPositionAllocator>();
     mobility.SetMobilityModel("ns3::ConstantPositionMobilityModel");
+    for (uint32_t i = 0; i < routers.GetN(); ++i)
+    {
+        positionModel->Add(Vector(distance * i, height, height));
+        std::cerr << "Node " << i << " is at (" << distance * i << ", " << height << ", " << height << ")" << std::endl;
+    }
+    mobility.SetPositionAllocator(positionModel);
     mobility.Install(routers);
 
     NetDeviceContainer routerDevices = wifi.Install(wifiPhy, wifiMac, routers);
@@ -198,12 +204,16 @@ main(int argc, char *argv[]) {
     //
     // Install the internet stack with OLSR on the nodes (IP)
     //
+
+    OlsrHelper olsrhelper;
     std::filebuf fb;
-    fb.open("test.txt", std::ios::out);
+    fb.open("olsr.txt", std::ios::out);
     std::ostream os(&fb);
     OutputStreamWrapper wrap(&os);
-    OlsrHelper olsrhelper;
-    olsrhelper.PrintRoutingTableAllAt(ns3::Time("60s"), Ptr<OutputStreamWrapper>(&wrap));
+    if(olsr_perf) {
+            olsrhelper.PrintRoutingTableAllEvery(ns3::Time("10ms"), Ptr<OutputStreamWrapper>(&wrap), Time::MS);
+    }
+
     InternetStackHelper internet;
     if (olsr) internet.SetRoutingHelper(olsrhelper);
     internet.Install(routers);
@@ -261,13 +271,16 @@ main(int argc, char *argv[]) {
     source.SetAttribute("MaxBytes", UintegerValue(maxBytes));
     // Set the amount of data to send per packet
     source.SetAttribute("SendSize", UintegerValue(send_size));
-    source.SetAttribute("UdpInterval", UintegerValue(1));
-    source.SetAttribute("UdpCount", UintegerValue(300));
-    ApplicationContainer sourceApps = source.Install(routers.Get(0));
-    sourceApps.Start(Seconds(30.0));
-    sourceApps.Stop(Seconds(90.0));
-    bulk_send = DynamicCast<CustomBulkSendApplication>(sourceApps.Get(0));
-    bulk_send->TraceConnectWithoutContext("Tx", MakeCallback(&TxPacket));
+    source.SetAttribute("UdpInterval", UintegerValue(udp_interval));
+    source.SetAttribute("UdpCount", UintegerValue(udp_count));
+
+    if(!olsr_perf) {
+        ApplicationContainer sourceApps = source.Install(routers.Get(0));
+        sourceApps.Start(MilliSeconds(start_at));
+        sourceApps.Stop(Seconds(180.0));
+        bulk_send = DynamicCast<CustomBulkSendApplication>(sourceApps.Get(0));
+        bulk_send->TraceConnectWithoutContext("Tx", MakeCallback(&TxPacket));
+    }
 
     //
     // Create a PacketSinkApplication and install it on laptop 2
@@ -277,7 +290,7 @@ main(int argc, char *argv[]) {
     ApplicationContainer sinkApps = sink.Install(routers.Get(3));
 
     sinkApps.Start(Seconds(0.0));
-    sinkApps.Stop(Seconds(90.0));
+    sinkApps.Stop(Seconds(180.0));
 
     Ptr<PacketSink> sink1 = DynamicCast<PacketSink>(sinkApps.Get(0));
     sink1->TraceConnectWithoutContext("Rx", MakeCallback(&RecvPacket));
@@ -306,11 +319,13 @@ main(int argc, char *argv[]) {
     NS_LOG_INFO("Done.");
 
 
-    std::cout << "Total Bytes Received: " << sink1->GetTotalRx() << " ("
+    std::cerr << "Total Bytes Received: " << sink1->GetTotalRx() << " ("
               << ((double) sink1->GetTotalRx() / maxBytes) * 100.0 << "%)" << std::endl;
-    std::cout << "Total packets received: " << packet_count_rx << std::endl;
-    std::cout << "Last packet received at: " << last_time_rx.GetMilliSeconds() << "ms" << std::endl;
-    std::cout << std::endl;
-    std::cout << "Total packets sent: " << packet_count_tx << std::endl;
-    std::cout << "Last packet sent at: " << last_time_tx.GetMilliSeconds() << "ms" << std::endl;
+    std::cerr << "Total packets received: " << packet_count_rx << std::endl;
+    std::cerr << "Total size of packets received: " << packet_size_rx << std::endl;
+    std::cerr << "Last packet received at: " << last_time_rx.GetMilliSeconds() << "ms" << std::endl;
+    std::cerr << std::endl;
+    std::cerr << "Total packets sent: " << packet_count_tx << std::endl;
+    std::cerr << "Total size of packets sent: " << packet_size_tx << std::endl;
+    std::cerr << "Last packet sent at: " << last_time_tx.GetMilliSeconds() << "ms" << std::endl;
 }

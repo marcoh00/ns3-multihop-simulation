@@ -248,7 +248,7 @@ namespace ns3 {
     }
 
     void CustomBulkSendApplication::AnnouncePacketsReceived(uint64_t rxcnt) {
-        m_rxBytes = rxcnt * m_sendSize;
+        m_rxBytes = rxcnt;
     }
 
 
