@@ -99,6 +99,8 @@ main(int argc, char *argv[]) {
     bool logging = false;
     // Use OLSR for wifi routing
     bool olsr = false;
+    // Use static ns3 routing
+    bool ns3routing = false;
     // Default: Stop after sending approx. 1 MiB of data
     uint32_t maxBytes = 1048576;
     // Default: 512 Bytes per packet
@@ -126,6 +128,7 @@ main(int argc, char *argv[]) {
     cmd.AddValue("tracing", "Flag to enable/disable tracing", tracing);
     cmd.AddValue("logging", "Flag to enable/disable logging", logging);
     cmd.AddValue("olsr", "Use OLSR for wifi routing", olsr);
+    cmd.AddValue("ns3routing", "Use static ns3 routing", ns3routing);
     cmd.AddValue("olsrperf", "OLSR performance measurement", olsr_perf);
     cmd.AddValue("maxBytes", "Total number of bytes for application to send", maxBytes);
     cmd.AddValue("send_size", "Bytes sent per packet", send_size);
@@ -227,7 +230,7 @@ main(int argc, char *argv[]) {
     Ipv4InterfaceContainer routerNet = ipv4.Assign(routerDevices);
 
 
-    if (!olsr) {
+    if (!olsr && !ns3routing) {
         //
         // Set up static routing to the packets get routed along the 4 different routers
         //
@@ -253,6 +256,9 @@ main(int argc, char *argv[]) {
         // Router 4 to Router 1 via via router 3
         Ptr<Ipv4StaticRouting> r4_l1tol2 = staticRoutingHelper.GetStaticRouting(router4addr);
         r4_l1tol2->AddHostRouteTo(Ipv4Address("10.1.2.1"), Ipv4Address("10.1.2.3"), 1);
+    } else if(!olsr && ns3routing) {
+        // Use ns3's routing helper (this will lead to static 1-hop-routing as everyone is in the same network segment)
+        Ipv4GlobalRoutingHelper::PopulateRoutingTables();
     }
 
     NS_LOG_INFO("Create Applications.");
@@ -324,7 +330,6 @@ main(int argc, char *argv[]) {
     std::cerr << "Total packets received: " << packet_count_rx << std::endl;
     std::cerr << "Total size of packets received: " << packet_size_rx << std::endl;
     std::cerr << "Last packet received at: " << last_time_rx.GetMilliSeconds() << "ms" << std::endl;
-    std::cerr << std::endl;
     std::cerr << "Total packets sent: " << packet_count_tx << std::endl;
     std::cerr << "Total size of packets sent: " << packet_size_tx << std::endl;
     std::cerr << "Last packet sent at: " << last_time_tx.GetMilliSeconds() << "ms" << std::endl;
