@@ -216,6 +216,7 @@ def comparison_graph(tcpfiles=['tcp_comparison.json',], udpfiles=['udp_comparsio
     assert len(tcpfiles) == len(titles)
     data_tcp = list()
     data_udp = list()
+    data_olsr = None
     y_tcp = []
     y_udp = []
 
@@ -229,7 +230,11 @@ def comparison_graph(tcpfiles=['tcp_comparison.json',], udpfiles=['udp_comparsio
             data_udp.append(json.load(fp))
         y_udp.append([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
     
+    with open('udp_comparison_speed.json', 'r') as fp:
+        data_olsr = json.load(fp)
+    
     distances = (3, 6, 12, 25, 75, 100, 150, 200, 400, 600)
+    y_udpreal = [0 for d in distances]
 
     for idx, measurement in enumerate(data_tcp):
         for datapoint in measurement:
@@ -238,6 +243,8 @@ def comparison_graph(tcpfiles=['tcp_comparison.json',], udpfiles=['udp_comparsio
         for distance, datapoints in measurement.items():
             if len(datapoints) > 0:
                 y_udp[idx][map_on_index(distance, distances)] = datapoints[0]['throughput']
+    for distance, ms in data_olsr.items():
+        y_udpreal[map_on_index(distance, distances)] = ms[0]['throughput']
     
     fig, axs = plt.subplots(len(tcpfiles), 1, sharex=True, sharey=True)
     if len(tcpfiles) == 1:
@@ -245,6 +252,7 @@ def comparison_graph(tcpfiles=['tcp_comparison.json',], udpfiles=['udp_comparsio
     for i in range(0, len(tcpfiles)):
         axs[i].plot(distances, y_tcp[i], '-o', label='TCP')
         axs[i].plot(distances, y_udp[i], '-o', label='UDP')
+        axs[i].plot(distances, y_udpreal, '-o', label='UDP (OLSR)')
         axs[i].set_xlabel("Distance (m)")
         axs[i].set_ylabel("Throughput (kB/s)")
         axs[i].set_title(titles[i])
