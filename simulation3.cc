@@ -15,12 +15,12 @@
  */
 
 // Network topology
-//                                              Wifi
-//                          - distance -    - distance -   - distance -
-//                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-//       l1 ------------ r1              r2             r3             r4 ------------ l2
-//           p2p                                                            p2p
-//           10.1.1.0/24                    10.1.2.0/24                     10.1.10.0/24
+//                              Wifi
+//          - distance -    - distance -   - distance -
+//       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//       r1              r2             r3             r4 
+//                                                        
+//                          10.1.2.0/24                   
 //
 // - Flow from n0 to n1 using BulkSendApplication.
 // - Tracing of queues and packet receptions to file "bulk-send.tr"
@@ -37,10 +37,9 @@
 
 // This simulation sets up a WiFi and point to point connections as shown above.
 // After that, it sets up static routing tables (and olsr if --olsr is specified).
-// When using OLSR the static tables only tell l1 how to get to r1 and r1 is supposed to get its route to r4
-// via OLSR. When using static routing it sets up routing tables such that r1 -> r2 -> r3 -> r4.
-// Unfortunately OLSR routing doesn't work yet, as the program segfaults somewhere inside ns3's code. I was not able
-// to fix this yet.
+// When specifying --olsrperf the olsr routing tables are written to a text file called olsr.txt and the simulation is terminated.
+// When using static routing (default) it sets up routing tables such that r1 -> r2 -> r3 -> r4.
+// Using the switch --ns3routing direct routes are setup (r1 -> r4)
 // The program proceeds by sending as many TCP or UDP packets with a configurable size (send_size) as it can,
 // until it has sent maxBytes bytes.
 
